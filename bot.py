@@ -28,7 +28,6 @@ except KeyError as e:
     print(f"CRITICAL ERROR: Missing environment variable: {e}")
     raise
 
-# Use the full email address for the sender filter
 ALERT_SENDER = os.environ.get("ALERT_SENDER", "parisbrugemons@gmail.com")
 POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL_SECONDS", "30"))
 PAPER_MODE = os.environ.get("PAPER_MODE", "true").lower() == "true"
@@ -41,14 +40,14 @@ IB_PORT = int(os.environ.get("IB_PORT", "4002"))
 PROCESSED_IDS_FILE = "processed_ids.json"
 TRADES_LOG = "trades.csv"
 
-# ── CLAUDE PARSER (2026 MODEL) ────────────────────────────────────────────────
+# ── CLAUDE PARSER ─────────────────────────────────────────────────────────────
 claude = Anthropic(api_key=ANTHROPIC_API_KEY)
 
 def parse_alert(subject, body):
     try:
         prompt = f"Parse this trading alert into JSON with keys: ticker, action, side, shares, price, ibkr_action. Alert: {subject} {body}"
         msg = claude.messages.create(
-            model="claude-3-5-sonnet-latest", 
+            model="claude-3-5-sonnet-latest",
             max_tokens=400,
             system="Return ONLY JSON.",
             messages=[{"role": "user", "content": prompt}]
@@ -104,7 +103,9 @@ def log_trade(parsed, result, safety):
 def safety_check(parsed):
     if KILL_SWITCH: return "KILL SWITCH ACTIVE"
     if not parsed.get("ticker") or parsed["ticker"] == "ERROR": return "INVALID DATA"
-    if int(parsed.get("shares", 0)) > MAX_SHARES: return "EXCEEDS MAX SHARES"
+    try:
+        if int(parsed.get("shares", 0)) > MAX_SHARES: return "EXCEEDS MAX SHARES"
+    except: return "INVALID SHARE COUNT"
     return None
 
 def submit_order(t, a, q, p):
@@ -121,7 +122,6 @@ def check_emails():
         mail.select("INBOX")
         
         log.info(f"Searching: FROM {ALERT_SENDER} (UNSEEN)")
-        # --- FIXED LINE BELOW ---
         _, data = mail.search(None, f'(FROM "{ALERT_SENDER}" UNSEEN)')
         email_ids = data[0].split()
         
@@ -142,4 +142,35 @@ def check_emails():
             log.info(f"Processing: {subject}")
             parsed = parse_alert(subject, body)
             
-            block
+            block_reason = safety_check(parsed)
+            if block_reason:
+                log.warning(f"Blocked: {block_reason}")
+                log_trade(parsed, None, block_reason)
+            else:
+                if PAPER_MODE:
+                    log.info(f"PAPER SUCCESS: {parsed['ticker']}")
+                    order_result = "PAPER_SUCCESS"
+                else:
+                    order_result = submit_order(parsed.get('ticker'), parsed.get('ibkr_action'), parsed.get('shares'), parsed.get('price'))
+                log_trade(parsed, str(order_result), None)
+
+            processed.add(uid)
+            save_processed_ids(processed)
+            
+        mail.logout()
+    except Exception as e:
+        log.error(f"Session Error: {e}")
+
+# ── MAIN TRIGGER ──────────────────────────────────────────────────────────────
+def main():
+    log.info("=" * 30)
+    log.info("AGENT STARTING (V.2026)")
+    log.info(f"Mode: {'PAPER' if PAPER_MODE else 'LIVE'}")
+    log.info("=" * 30)
+    
+    while True:
+        check_emails()
+        time.sleep(POLL_INTERVAL)
+
+if __name__ == "__main__":
+    main()
