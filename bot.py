@@ -25,10 +25,9 @@ try:
     EMAIL_PASSWORD = os.environ["EMAIL_PASSWORD"]
     ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
 except KeyError as e:
-    print(f"CRITICAL ERROR: Missing environment variable: {e}")
+    print(f"CRITICAL ERROR: Missing environment variable in Railway: {e}")
     raise
 
-# Use the full email address for the sender filter
 ALERT_SENDER = os.environ.get("ALERT_SENDER", "parisbrugemons@gmail.com")
 POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL_SECONDS", "30"))
 PAPER_MODE = os.environ.get("PAPER_MODE", "true").lower() == "true"
@@ -41,14 +40,14 @@ IB_PORT = int(os.environ.get("IB_PORT", "4002"))
 PROCESSED_IDS_FILE = "processed_ids.json"
 TRADES_LOG = "trades.csv"
 
-# ── CLAUDE PARSER (2026 MODEL) ────────────────────────────────────────────────
+# ── CLAUDE PARSER ─────────────────────────────────────────────────────────────
 claude = Anthropic(api_key=ANTHROPIC_API_KEY)
 
 def parse_alert(subject, body):
     try:
         prompt = f"Parse this trading alert into JSON with keys: ticker, action, side, shares, price, ibkr_action. Alert: {subject} {body}"
         msg = claude.messages.create(
-            model="claude-haiku-4-5",  # The official 2026 fast model
+            model="claude-3-5-sonnet-latest",
             max_tokens=400,
             system="Return ONLY JSON.",
             messages=[{"role": "user", "content": prompt}]
@@ -116,9 +115,3 @@ def check_emails():
     processed = load_processed_ids()
     try:
         log.info("Connecting to Gmail...")
-        mail = imaplib.IMAP4_SSL("imap.gmail.com")
-        mail.login(EMAIL_USERNAME, EMAIL_PASSWORD)
-        mail.select("INBOX")
-        
-        log.info(f"Searching: FROM {ALERT_SENDER} (UNSEEN)")
-        _, data = mail.search(None, f
