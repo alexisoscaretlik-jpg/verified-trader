@@ -47,15 +47,16 @@ def parse_alert(subject, body):
     try:
         prompt = f"Parse this trading alert into JSON with keys: ticker, action, side, shares, price, ibkr_action. Alert: {subject} {body}"
         msg = claude.messages.create(
-            model="claude-3-5-sonnet-latest",
+            model="claude-3-7-sonnet-latest", # Updated for April 2026
             max_tokens=400,
             system="Return ONLY JSON.",
             messages=[{"role": "user", "content": prompt}]
         )
         text = msg.content[0].text
+        # Safety for markdown formatting
         if "```json" in text:
             text = text.split("```json")[1].split("```")[0]
-        return json.loads(text)
+        return json.loads(text.strip())
     except Exception as e:
         log.error(f"Claude Error: {e}")
         return {"ticker": "ERROR"}
