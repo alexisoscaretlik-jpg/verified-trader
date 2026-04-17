@@ -44,13 +44,14 @@ PROCESSED_IDS_FILE = "processed_ids.json"
 TRADES_LOG = "trades.csv"
 
 # ── CLAUDE PARSER ─────────────────────────────────────────────────────────────
+
 claude = Anthropic(api_key=ANTHROPIC_API_KEY)
 
 def parse_alert(subject, body):
     try:
         prompt = f"Parse this trading alert into JSON with keys: ticker, action, side, shares, price, ibkr_action. Alert: {subject} {body}"
         msg = claude.messages.create(
-            model="claude-3-haiku-20240307",
+            model="claude-3-5-haiku-latest",
             max_tokens=400,
             system="Return ONLY JSON.",
             messages=[{"role": "user", "content": prompt}]
