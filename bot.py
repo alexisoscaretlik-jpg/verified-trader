@@ -5,9 +5,7 @@ import json
 import time
 import csv
 import logging
-import re
-import hashlib
-from datetime import datetime, timezone
+from datetime import datetime
 from email.header import decode_header
 from anthropic import Anthropic
 
@@ -19,7 +17,6 @@ logging.basicConfig(
 )
 log = logging.getLogger("bot")
 
-# ── STARTUP SIGNAL ────────────────────────────────────────────────────────────
 print("REALLY STARTING NOW - INITIALIZING BOT")
 
 # ── CONFIGURATION ─────────────────────────────────────────────────────────────
@@ -31,7 +28,8 @@ except KeyError as e:
     print(f"CRITICAL ERROR: Missing environment variable: {e}")
     raise
 
-ALERT_SENDER = os.environ.get("ALERT_SENDER", "gmail.com")
+# Use the full email address for the sender filter
+ALERT_SENDER = os.environ.get("ALERT_SENDER", "parisbrugemons@gmail.com")
 POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL_SECONDS", "30"))
 PAPER_MODE = os.environ.get("PAPER_MODE", "true").lower() == "true"
 KILL_SWITCH = os.environ.get("KILL_SWITCH", "false").lower() == "true"
@@ -43,33 +41,33 @@ IB_PORT = int(os.environ.get("IB_PORT", "4002"))
 PROCESSED_IDS_FILE = "processed_ids.json"
 TRADES_LOG = "trades.csv"
 
-# ── CLAUDE PARSER ─────────────────────────────────────────────────────────────
-
+# ── CLAUDE PARSER (2026 MODEL) ────────────────────────────────────────────────
 claude = Anthropic(api_key=ANTHROPIC_API_KEY)
 
 def parse_alert(subject, body):
     try:
         prompt = f"Parse this trading alert into JSON with keys: ticker, action, side, shares, price, ibkr_action. Alert: {subject} {body}"
         msg = claude.messages.create(
-            model="claude-3-5-haiku-latest",
+            model="claude-haiku-4-5",  # The official 2026 fast model
             max_tokens=400,
             system="Return ONLY JSON.",
             messages=[{"role": "user", "content": prompt}]
         )
-        # Extract JSON from response
         text = msg.content[0].text
         if "```json" in text:
             text = text.split("```json")[1].split("```")[0]
         return json.loads(text)
     except Exception as e:
         log.error(f"Claude Error: {e}")
-        return {"ticker": "ERROR", "confidence": "low"}
+        return {"ticker": "ERROR"}
 
 # ── HELPERS ───────────────────────────────────────────────────────────────────
 def load_processed_ids():
     if os.path.exists(PROCESSED_IDS_FILE):
-        with open(PROCESSED_IDS_FILE, 'r') as f:
-            return set(json.load(f))
+        try:
+            with open(PROCESSED_IDS_FILE, 'r') as f:
+                return set(json.load(f))
+        except: return set()
     return set()
 
 def save_processed_ids(ids):
@@ -102,11 +100,7 @@ def log_trade(parsed, result, safety):
         writer.writerow([datetime.now().isoformat(), parsed.get('ticker'), parsed.get('action'), 
                          parsed.get('shares'), parsed.get('price'), safety or result])
 
-# ── BROKER STUBS (Replace with real IBKR logic when ready) ────────────────────
-def connect_ibkr():
-    log.info(f"Connecting to IBKR at {IB_HOST}:{IB_PORT}...")
-    return False # Placeholder
-
+# ── BROKER STUBS ──────────────────────────────────────────────────────────────
 def safety_check(parsed):
     if KILL_SWITCH: return "KILL SWITCH ACTIVE"
     if not parsed.get("ticker") or parsed["ticker"] == "ERROR": return "INVALID DATA"
@@ -126,55 +120,5 @@ def check_emails():
         mail.login(EMAIL_USERNAME, EMAIL_PASSWORD)
         mail.select("INBOX")
         
-        log.info(f"Checking for unread emails from: {ALERT_SENDER}")
-        _, data = mail.search(None, f'(FROM "{ALERT_SENDER}" UNSEEN)')
-        email_ids = data[0].split()
-        
-        if not email_ids:
-            log.info("No new alerts.")
-            mail.logout()
-            return
-
-        for eid in email_ids:
-            uid = eid.decode()
-            if uid in processed: continue
-
-            _, msg_data = mail.fetch(eid, "(RFC822)")
-            msg = email.message_from_bytes(msg_data[0][1])
-            subject = decode_mime_header(msg.get("Subject", ""))
-            body = get_email_body(msg)
-            
-            log.info(f"Processing Alert: {subject}")
-            parsed = parse_alert(subject, body)
-            
-            block_reason = safety_check(parsed)
-            if block_reason:
-                log.warning(f"Trade Blocked: {block_reason}")
-                log_trade(parsed, None, block_reason)
-            else:
-                if PAPER_MODE:
-                    log.info(f"PAPER TRADE: {parsed['ticker']}")
-                    order_result = {"status": "PAPER_SUCCESS"}
-                else:
-                    order_result = submit_order(parsed['ticker'], parsed['ibkr_action'], parsed['shares'], parsed['price'])
-                log_trade(parsed, order_result, None)
-
-            processed.add(uid)
-            save_processed_ids(processed)
-            
-        mail.logout()
-    except Exception as e:
-        log.error(f"Check Email Error: {e}")
-
-def main():
-    log.info("=" * 30)
-    log.info("AGENT STARTING")
-    log.info(f"Mode: {'PAPER' if PAPER_MODE else 'LIVE'}")
-    log.info("=" * 30)
-    
-    while True:
-        check_emails()
-        time.sleep(POLL_INTERVAL)
-
-if __name__ == "__main__":
-    main()
+        log.info(f"Searching: FROM {ALERT_SENDER} (UNSEEN)")
+        _, data = mail.search(None, f
