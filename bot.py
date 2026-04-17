@@ -284,7 +284,8 @@ def check_emails():
         mail = imaplib.IMAP4_SSL("imap.gmail.com")
         mail.login(EMAIL_USERNAME, EMAIL_PASSWORD)
         mail.select("INBOX")
-        _, data = mail.search(None, f'(FROM "{ALERT_SENDER}" UNSEEN)')
+        log.info("Checking inbox for unread emails...")
+        _, data = mail.search(None, 'UNSEEN')
         email_ids = data[0].split()
         if not email_ids:
             mail.logout()
