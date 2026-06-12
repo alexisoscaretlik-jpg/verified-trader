@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Camera -->
+    <key>NSCameraUsageDescription</key>
+    <string>PhotoAngle needs camera access to capture photos for angle correction.</string>
+
+    <!-- Location (GPS + heading for Street View reference) -->
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>PhotoAngle uses your GPS location to fetch a Google Street View reference image, which improves the accuracy of AI-generated angle corrections when you're outdoors.</string>
+
+    <!-- Photo Library (save results) -->
+    <key>NSPhotoLibraryAddUsageDescription</key>
+    <string>PhotoAngle saves angle-corrected photos to your Camera Roll.</string>
+
+    <!-- Photo Library (pick existing photos) -->
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>PhotoAngle can correct the angle of photos from your photo library.</string>
+
+    <!-- Required device capabilities -->
+    <key>UIRequiredDeviceCapabilities</key>
+    <array>
+        <string>camera</string>
+        <string>location-services</string>
+    </array>
+
+    <!-- Supported orientations -->
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+    </array>
+
+    <!-- Network security: allow HTTPS to Google APIs -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsArbitraryLoads</key>
+        <false/>
+    </dict>
+
+    <!-- App appearance -->
+    <key>UILaunchScreen</key>
+    <dict/>
+</dict>
+</plist>
