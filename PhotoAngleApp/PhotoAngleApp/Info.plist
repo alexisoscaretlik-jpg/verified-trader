@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Camera -->
+    <key>NSCameraUsageDescription</key>
+    <string>PhotoAngle uses the camera to capture photos and LiDAR depth maps for geometrically-accurate angle correction.</string>
+
+    <!-- ARKit (LiDAR depth + burst pose tracking) -->
+    <key>NSCameraUsageDescription</key>
+    <string>PhotoAngle needs camera access for ARKit world tracking and LiDAR depth capture.</string>
+
+    <!-- Location (GPS + heading for outdoor Street View grounding) -->
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>PhotoAngle uses GPS to fetch a Street View reference image at your location, which guides the AI when filling occluded areas in outdoor shots.</string>
+
+    <!-- Photo Library -->
+    <key>NSPhotoLibraryAddUsageDescription</key>
+    <string>PhotoAngle saves angle-corrected photos to your Camera Roll.</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>PhotoAngle can correct the angle of photos from your library.</string>
+
+    <!-- ARKit world tracking requirement -->
+    <key>UIRequiredDeviceCapabilities</key>
+    <array>
+        <string>arkit</string>
+        <string>camera</string>
+    </array>
+
+    <!-- Portrait only -->
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+    </array>
+
+    <!-- No HTTP allowed (all APIs are HTTPS) -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsArbitraryLoads</key>
+        <false/>
+    </dict>
+
+    <key>UILaunchScreen</key>
+    <dict/>
+</dict>
+</plist>
