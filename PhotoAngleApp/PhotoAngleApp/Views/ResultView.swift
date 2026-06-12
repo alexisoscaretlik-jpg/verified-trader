@@ -4,106 +4,84 @@ struct ResultView: View {
     let result: AngleCorrectionResult
     let onDone: () -> Void
 
-    @State private var showingOriginal  = false
-    @State private var showingStreetView = false
-    @State private var savedSuccessfully = false
-    @State private var saveError: String?
+    @State private var showOriginal   = false
+    @State private var showDiagnostics = false
+    @State private var saved = false
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
 
-                    // Before / After toggle
+                    // ── Main image toggle ─────────────────────────────────
                     ZStack(alignment: .topTrailing) {
-                        Image(uiImage: showingOriginal
-                              ? result.original
-                              : result.corrected)
-                            .resizable()
-                            .scaledToFit()
-                            .cornerRadius(12)
-                            .shadow(radius: 6)
-                            .animation(.easeInOut(duration: 0.25), value: showingOriginal)
+                        Image(uiImage: showOriginal ? result.original : result.corrected)
+                            .resizable().scaledToFit()
+                            .cornerRadius(12).shadow(radius: 6)
+                            .animation(.easeInOut(duration: 0.2), value: showOriginal)
 
-                        Text(showingOriginal ? "ORIGINAL" : "CORRECTED")
-                            .font(.caption.bold())
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Capsule().fill(showingOriginal ? Color.gray : Color.blue))
-                            .padding(12)
+                        Text(showOriginal ? "ORIGINAL" : "CORRECTED")
+                            .font(.caption.bold()).foregroundColor(.white)
+                            .padding(.horizontal, 8).padding(.vertical, 4)
+                            .background(Capsule().fill(showOriginal ? Color.gray : Color.blue))
+                            .padding(10)
                     }
                     .padding(.horizontal)
 
                     Button {
-                        showingOriginal.toggle()
+                        showOriginal.toggle()
                     } label: {
-                        Label(showingOriginal ? "Show Corrected" : "Compare with Original",
-                              systemImage: "arrow.left.arrow.right")
-                            .font(.subheadline)
+                        Label(showOriginal ? "Show Corrected" : "Compare Original",
+                              systemImage: "arrow.left.arrow.right").font(.subheadline)
                     }
 
-                    // Metadata badge
-                    HStack(spacing: 12) {
-                        badgeView(icon: "rotate.right",
-                                  text: String(format: "%.0f°", result.degreesApplied))
-                        badgeView(icon: "arrow.right",
-                                  text: result.direction.rawValue)
-                        if result.streetViewReference != nil {
-                            badgeView(icon: "map", text: "Street View guided")
+                    // ── Metadata badges ───────────────────────────────────
+                    HStack(spacing: 10) {
+                        badge("rotate.right",
+                              String(format: "%.0f°", result.degreesApplied))
+                        badge("arrow.right", result.direction.rawValue)
+                        badge(result.wasIndoor ? "house.fill" : "location.fill",
+                              result.wasIndoor ? "Indoor" : "Outdoor")
+                        if !result.wasIndoor || result.holePercent < 99 {
+                            badge("waveform",
+                                  String(format: "%.0f%% AI", result.holePercent))
                         }
                     }
                     .padding(.horizontal)
 
-                    // Street View reference (if available)
-                    if let ref = result.streetViewReference {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Label("Street View Reference Used", systemImage: "map")
-                                .font(.caption.bold())
-                                .foregroundColor(.secondary)
-                            Button {
-                                showingStreetView.toggle()
-                            } label: {
-                                ZStack(alignment: .topTrailing) {
-                                    Image(uiImage: ref)
-                                        .resizable()
-                                        .scaledToFit()
-                                        .frame(height: showingStreetView ? nil : 120)
-                                        .cornerRadius(8)
-                                    Image(systemName: showingStreetView ? "chevron.up" : "chevron.down")
-                                        .padding(6)
-                                        .background(Circle().fill(Color.black.opacity(0.4)))
-                                        .foregroundColor(.white)
-                                        .padding(8)
+                    // ── Diagnostics (stage-1 output + mask) ──────────────
+                    if result.warpedWithHoles != nil || result.streetViewReference != nil {
+                        DisclosureGroup("Diagnostics", isExpanded: $showDiagnostics) {
+                            VStack(alignment: .leading, spacing: 12) {
+                                if let warped = result.warpedWithHoles {
+                                    diagRow(warped, label: "Stage 1: geometry only",
+                                            note: String(format: "%.0f%% holes", result.holePercent))
+                                }
+                                if let mask = result.holeMask {
+                                    diagRow(mask, label: "Hole mask (white = AI fill region)")
+                                }
+                                if let sv = result.streetViewReference {
+                                    diagRow(sv, label: result.wasIndoor
+                                            ? "Indoor grounding (burst composite)"
+                                            : "Street View reference (outdoor grounding)")
                                 }
                             }
                         }
                         .padding(.horizontal)
                     }
 
-                    // Save button
-                    Button(action: saveToPhotoLibrary) {
-                        Label(savedSuccessfully ? "Saved!" : "Save to Camera Roll",
-                              systemImage: savedSuccessfully ? "checkmark.circle.fill" : "square.and.arrow.down")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(savedSuccessfully ? Color.green : Color.blue)
-                            .foregroundColor(.white)
-                            .cornerRadius(14)
+                    // ── Save ─────────────────────────────────────────────
+                    Button(action: save) {
+                        Label(saved ? "Saved!" : "Save to Camera Roll",
+                              systemImage: saved ? "checkmark.circle.fill" : "square.and.arrow.down")
+                            .font(.headline).frame(maxWidth: .infinity).padding()
+                            .background(saved ? Color.green : Color.blue)
+                            .foregroundColor(.white).cornerRadius(14)
                     }
+                    .disabled(saved)
                     .padding(.horizontal)
-                    .disabled(savedSuccessfully)
 
-                    if let err = saveError {
-                        Text(err)
-                            .font(.caption)
-                            .foregroundColor(.red)
-                            .padding(.horizontal)
-                    }
-
-                    Button("Done — Back to Camera", action: onDone)
-                        .padding(.bottom, 32)
+                    Button("Done", action: onDone).padding(.bottom, 32)
                 }
                 .padding(.top)
             }
@@ -112,21 +90,31 @@ struct ResultView: View {
         }
     }
 
-    private func saveToPhotoLibrary() {
-        UIImageWriteToSavedPhotosAlbum(
-            result.corrected, nil, nil, nil
-        )
-        savedSuccessfully = true
-    }
-
-    private func badgeView(icon: String, text: String) -> some View {
+    private func badge(_ icon: String, _ text: String) -> some View {
         HStack(spacing: 4) {
             Image(systemName: icon).font(.caption)
             Text(text).font(.caption.bold())
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 8).padding(.vertical, 6)
         .background(Capsule().fill(Color.blue.opacity(0.1)))
         .foregroundColor(.blue)
+    }
+
+    private func diagRow(_ img: UIImage, label: String, note: String = "") -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(label).font(.caption.bold()).foregroundColor(.secondary)
+                if !note.isEmpty {
+                    Text(note).font(.caption).foregroundColor(.orange)
+                }
+            }
+            Image(uiImage: img).resizable().scaledToFit()
+                .cornerRadius(6)
+        }
+    }
+
+    private func save() {
+        UIImageWriteToSavedPhotosAlbum(result.corrected, nil, nil, nil)
+        saved = true
     }
 }
